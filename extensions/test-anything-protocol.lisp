@@ -1,6 +1,9 @@
 ;;;; -*- Mode: Lisp; Syntax: ANSI-Common-Lisp -*-
 #|
-  Copyright (c) 2009-2012, Thomas M. Hermann
+
+  Test Anything Protocol (TAP) support for LISP-UNIT
+
+  Copyright (c) 2009-2012, Ryan Davis
 
   Permission is hereby granted, free of charge, to any person obtaining 
   a copy of this software and associated documentation files (the "Software"), 
@@ -20,19 +23,31 @@
   ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR 
   OTHER DEALINGS IN THE SOFTWARE.
 
+  References
+  [TAP] http://testanything.org/wiki/index.php/Main_Page
+  
 |#
 
-(in-package :asdf)
+(in-package :lisp-unit)
 
-(defsystem :lisp-unit
-  :description "Common Lisp library that supports unit testing."
-  :version "0.9.2"
-  :author "Thomas M. Hermann <thomas.m.hermann@odonata-research.com>"
-  :license "MIT"
-  :components
-  ((:file "lisp-unit")
-   (:module extensions
-    :depends-on ("lisp-unit")
-    :components ((:file "rational")
-                 (:file "floating-point")
-                 (:file "test-anything-protocol")))))
+;;; Symbols exported from the TAP extension
+
+(export '(with-tap-output))
+
+
+(defmacro with-tap-output ((path) &body body)
+  "write test results in TAP format to the provided path. If no tests are run
+in the body, no test file will be written."
+  `(call-with-tap-output ,path #'(lambda () ,@body)))
+
+(defun call-with-tap-output (path bodyfn)
+  (check-type path (or string pathname))
+  (ensure-directories-exist path)
+  (handler-bind
+      ((test-failure (lambda (f) (break "Write out failure ~a" f)))
+       (test-error (lambda (e) (break "Write out error ~a" e)))
+       (test-complete (lambda (c) (break "Write out completion ~a" c))))
+    (let ((*signal-test-events-p* T))
+      (funcall bodyfn))))
+
+
