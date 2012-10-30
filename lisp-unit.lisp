@@ -123,6 +123,34 @@ assertion.")
     (y-or-n-p "~A -- debug?" condition))
    (*use-debugger*)))
 
+;;; Advanced output control
+
+(defvar *signal-test-events-p* nil
+  "enables signaling conditions for test failures, errors, and completions")
+
+(defvar *current-test* nil
+  "refers to the currently executing test")
+
+(define-condition test-failure ()
+  ((test :initarg :test :reader test)
+   (failure-type :initarg :type :reader failure-type)
+   (failure-form :initarg :form :reader failure-form)
+   (expected :initarg :expected :reader expected)
+   (actual :initarg :actual :reader actual)
+   (extras :initarg :extras :reader extras))
+  (:documentation "signaled when a test fails"))
+
+(define-condition test-error ()
+  ((test :initarg :test :reader test)
+   (error-condition :initarg :condition :reader error-condition))
+  (:documentation "signaled when a test encounters a runtime error"))
+
+(define-condition test-complete ()
+  ((test :initarg :test :reader test)
+   (passed :initarg :passed :reader passed)
+   (failed :initarg :failed :reader failed))
+  (:documentation "signaled when a test run is complete"))
+
 ;;; Failure control strings
 
 (defgeneric print-failure (type form expected actual extras)
@@ -200,6 +228,10 @@ assertion.")
     :type string
     :initarg :doc
     :reader doc)
+   (name
+    :type symbol
+    :initarg :name
+    :reader name)
    (code
     :type list
     :initarg :code
@@ -228,7 +260,7 @@ assertion.")
        (setf
         ;; Unit test
         (gethash ',name (package-table *package* t))
-        (make-instance 'unit-test :doc doc :code ',code))
+        (make-instance 'unit-test :doc doc :code ',code :name ',name))
        ;; Tags
        (loop for tag in ',tag do
              (pushnew
@@ -414,8 +446,12 @@ assertion.")
         (incf *pass*)
         (incf *fail*))
     ;; Report the assertion
-    (when (and (not passed) *print-failures*)
-      (print-failure type form expected actual extras))
+    (unless passed
+      (when *signal-test-events-p*
+        (signal 'test-failure :test *current-test* :type type :form form
+                              :expected expected :actual actual :extras extras))
+      (when *print-failures*
+        (print-failure type form expected actual extras)))
     ;; Return the result
     passed))
 
@@ -509,6 +545,8 @@ assertion.")
     (when (eq :error exerr)
       (incf (exerr results))
       (push test-name (error-tests results)))
+    (when *signal-test-events-p*
+      (signal 'test-complete :test *current-test* :passed pass :failed fail))
     ;; Print a summary of the results
     (when (or *print-summary* *print-failures* *print-errors*)
       (print-summary
@@ -538,6 +576,8 @@ assertion.")
         (*fail* 0))
     (handler-bind
         ((error (lambda (condition)
+                  (when *signal-test-events-p*
+                    (signal 'test-error :test *current-test* :condition condition))
                   (when *print-errors*
                     (print-error condition))
                   (if (use-debugger-p condition)
@@ -565,7 +605,8 @@ assertion.")
    for test-name in test-names
    as unit-test = (gethash test-name table)
    if unit-test do
-   (record-result test-name (code unit-test) results)
+    (let ((*current-test* unit-test))
+      (record-result test-name (code unit-test) results))
    else do
    (push test-name (missing-tests results))
    finally
