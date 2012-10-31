@@ -131,23 +131,24 @@ assertion.")
 (defvar *current-test* nil
   "refers to the currently executing test")
 
-(define-condition test-failure ()
-  ((test :initarg :test :reader test)
-   (failure-type :initarg :type :reader failure-type)
+(define-condition test-outcome ()
+  ((test :initarg :test :reader test))
+  (:documentation "base condition for all test outcomes"))
+
+(define-condition test-failure (test-outcome)
+  ((failure-type :initarg :type :reader failure-type)
    (failure-form :initarg :form :reader failure-form)
    (expected :initarg :expected :reader expected)
    (actual :initarg :actual :reader actual)
    (extras :initarg :extras :reader extras))
   (:documentation "signaled when a test fails"))
 
-(define-condition test-error ()
-  ((test :initarg :test :reader test)
-   (error-condition :initarg :condition :reader error-condition))
+(define-condition test-error (test-outcome)
+  ((error-condition :initarg :condition :reader error-condition))
   (:documentation "signaled when a test encounters a runtime error"))
 
-(define-condition test-complete ()
-  ((test :initarg :test :reader test)
-   (passed :initarg :passed :reader passed)
+(define-condition test-complete (test-outcome)
+  ((passed :initarg :passed :reader passed)
    (failed :initarg :failed :reader failed))
   (:documentation "signaled when a test run is complete"))
 
