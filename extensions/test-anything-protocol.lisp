@@ -46,9 +46,15 @@
 (defgeneric tap-output (event)
   (:documentation "writes TAP output"))
 
+(defmethod tap-output :around ((evt test-outcome))
+  (incf *tap-test-count*)
+  (call-next-method)
+  ;; re-signal for anyone else who cares
+  (signal evt))
+
 (defmethod tap-output ((f test-failure))
   "write out the failure info"
-  (format *tap-out-stream* "not ok ~d ~a~%" (incf *tap-test-count*) (name (test f)))
+  (format *tap-out-stream* "not ok ~d ~a~%" *tap-test-count* (name (test f)))
   (with-yaml-block ()
     (apply #'tap-output/indented "expected" (expected f))
     (apply #'tap-output/indented "actual" (actual f))
@@ -65,7 +71,7 @@
 
 (defmethod tap-output ((f test-error))
   "print the error type and message"
-  (format *tap-out-stream* "not ok ~d ~a~%" (incf *tap-test-count*) (name (test f)))
+  (format *tap-out-stream* "not ok ~d ~a~%" *tap-test-count* (name (test f)))
   (with-yaml-block ()
     (tap-output/indented "error"
                          (type-of (error-condition f))
@@ -78,7 +84,7 @@
   "write out the successful test"
   (when (plusp (passed f))
     (format *tap-out-stream* "ok ~d ~a (~d assertions) ~%"
-            (incf *tap-test-count*) (name (test f)) (passed f))))
+            *tap-test-count* (name (test f)) (passed f))))
 
 (defmethod tap-output ((evt (eql :done)))
   (format *tap-out-stream* "1..~d~%" *tap-test-count*))
