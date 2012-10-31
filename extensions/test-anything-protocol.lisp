@@ -34,20 +34,76 @@
 
 (export '(with-tap-output))
 
+(defvar *tap-out-stream* nil "where to write TAP output to")
+(defvar *tap-test-count* nil "how many tests we;ve seen so far")
 
-(defmacro with-tap-output ((path) &body body)
-  "write test results in TAP format to the provided path. If no tests are run
-in the body, no test file will be written."
-  `(call-with-tap-output ,path #'(lambda () ,@body)))
+(defmacro with-yaml-block ((stream) &body body)
+  `(progn
+    (format ,stream "  ---~%")
+    ,@body
+    (format ,stream "  ...~%")))
+
+(defgeneric tap-output (event &optional stream)
+  (:documentation "writes TAP output"))
+
+(defmethod tap-output ((f test-failure) &optional (stream *tap-out-stream*))
+  "write out the failure info"
+  (format stream "not ok ~d ~a~%" (incf *tap-test-count*) (name (test f)))
+  (with-yaml-block (stream)
+    (apply #'tap-output/indented stream "expected" (expected f))
+    (apply #'tap-output/indented stream "actual" (actual f))
+    ;; extras is a function that returns a plist of key/values
+    (when (extras f)
+      (let ((extras-plist (funcall (extras f))))
+        ;; walk the plist
+        (loop for (key value) on extras-plist by #'cddr
+              ;; if the key == value, then it's likely just a description of
+              ;; the assertion.
+              if (equalp key value) do (tap-output/indented stream "message" key)
+              ;; otherwise it's likely a binding
+              else do (tap-output/indented stream key value))))))
+
+(defmethod tap-output ((f test-error) &optional (stream *tap-out-stream*))
+  "print the error type and message"
+  (format stream "not ok ~d ~a~%" (incf *tap-test-count*) (name (test f)))
+  (with-yaml-block (stream)
+    (tap-output/indented stream "error"
+                         (type-of (error-condition f)) (error-condition f))))
+
+(defmethod tap-output ((f test-complete) &optional (stream *tap-out-stream*))
+  "write out the successful test"
+  (when (plusp (passed f))
+    (format stream "ok ~d ~a (~d assertions) ~%"
+            (incf *tap-test-count*) (name (test f)) (passed f))))
+
+(defmethod tap-output ((evt (eql :done)) &optional (stream *tap-out-stream*))
+  (format stream "1..~d~%" *tap-test-count*))
+
+(defun tap-output/indented (stream label &rest datum)
+  "write an indented block with a label"
+  (format stream "  ~a: |~%" label)
+  ;; see http://www.lispworks.com/documentation/HyperSpec/Body/22_ceb.htm
+  ;; complicated format string adds 4 space indentation regardless of newlines
+  ;; in the datum.
+  (format stream "~<    ~@;~{~S~^~%~}~:>~%" (list datum)))
 
 (defun call-with-tap-output (path bodyfn)
   (check-type path (or string pathname))
   (ensure-directories-exist path)
   (handler-bind
-      ((test-failure (lambda (f) (break "Write out failure ~a" f)))
-       (test-error (lambda (e) (break "Write out error ~a" e)))
-       (test-complete (lambda (c) (break "Write out completion ~a" c))))
-    (let ((*signal-test-events-p* T))
-      (funcall bodyfn))))
+      ((test-failure #'tap-output)
+       (test-error #'tap-output)
+       (test-complete #'tap-output))
+    (let ((*signal-test-events-p* T)
+          (*tap-out-stream* T)
+          (*tap-test-count* 0)
+          (*print-errors* nil)
+          (*print-failures* nil)
+          (*print-summary* nil))
+      (funcall bodyfn)
+      (tap-output :done))))
 
-
+(defmacro with-tap-output ((path) &body body)
+  "write test results in TAP format to the provided path. If no tests are run
+in the body, no test file will be written."
+  `(call-with-tap-output ,path #'(lambda () ,@body)))
