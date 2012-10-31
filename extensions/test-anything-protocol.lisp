@@ -101,8 +101,7 @@
   (check-type path (or string pathname))
   (ensure-directories-exist path)
   (let ((*tap-test-count* 0)
-        (*signal-test-events-p* T)
-        (*tap-out-stream* T))
+        (*signal-test-events-p* T))
     (with-open-file (*tap-out-stream* path :direction :output :if-exists :supersede)
       (handler-bind
           ((test-failure #'tap-output)
