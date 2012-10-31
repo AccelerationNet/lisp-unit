@@ -591,11 +591,14 @@ assertion.")
 
 (defun %run-all-thunks (&optional (package *package*))
   "Run all of the test thunks in the package."
-  (let ((tests nil))
-    (maphash #'(lambda (k v)
-                 (declare (ignore v))
-                 (push k tests))
-             (package-table package))
+  (let ((tests nil)
+        (table (package-table package)))
+    ;; only loop through the table if we've got one
+    (when table
+      (maphash #'(lambda (k v)
+                   (declare (ignore v))
+                   (push k tests))
+               table))
     (%run-thunks tests package)))
 
 (defun %run-thunks (test-names &optional (package *package*))
