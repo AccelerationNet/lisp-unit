@@ -68,7 +68,11 @@
   (format stream "not ok ~d ~a~%" (incf *tap-test-count*) (name (test f)))
   (with-yaml-block (stream)
     (tap-output/indented stream "error"
-                         (type-of (error-condition f)) (error-condition f))))
+                         (type-of (error-condition f))
+                         ;; convert to string first; default output will looks
+                         ;; like `#<type msg>`, and `#` is the comment
+                         ;; character in TAP.
+                         (princ-to-string (error-condition f)))))
 
 (defmethod tap-output ((f test-complete) &optional (stream *tap-out-stream*))
   "write out the successful test"
