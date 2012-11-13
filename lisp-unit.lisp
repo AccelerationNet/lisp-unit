@@ -598,7 +598,14 @@ assertion.")
                    (declare (ignore v))
                    (push k tests))
                table))
-    (%run-thunks tests package)))
+    ;; reverse the tests retain the natural ordering from the previous
+    ;; implementation (f30d769). It shouldn't matter, but I just spent 12
+    ;; hours finding out that it does. In my project, running tests via
+    ;; `asdf:test-system` fails if I don't reverse these here. Running the
+    ;; tests directly with `run-tests` is fine, but there's some hidden
+    ;; interaction when running tests via asdf that I can't see, and reversing
+    ;; this list fixes it.
+    (%run-thunks (nreverse tests) package)))
 
 (defun %run-thunks (test-names &optional (package *package*))
   "Run the list of test thunks in the package."
