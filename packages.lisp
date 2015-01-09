@@ -1,9 +1,10 @@
 (in-package :cl-user)
 
+ ;; clisp requires `defpackage`s to be treated as top-level forms
 (#+clisp progn
  
  #-clisp handler-bind
-         ;; fixes sbcl SUPER warnings that prevent automatic fasl loading
+ ;; fixes sbcl SUPER warnings that prevent automatic fasl loading
  #-clisp ((warning (lambda (c)
                      (format *error-output* "~A~%~S" c c)
                      (muffle-warning c))))
