@@ -1,10 +1,13 @@
 (in-package :cl-user)
 
-(handler-bind
-    ;; fixes sbcl SUPER warnings that prevent automatic fasl loading
-    ((warning (lambda (c)
-                (format *error-output* "~A~%~S" c c)
-                (muffle-warning c))))
+ ;; clisp requires `defpackage`s to be treated as top-level forms
+(#+clisp progn
+ 
+ #-clisp handler-bind
+ ;; fixes sbcl SUPER warnings that prevent automatic fasl loading
+ #-clisp ((warning (lambda (c)
+                     (format *error-output* "~A~%~S" c c)
+                     (muffle-warning c))))
   (defpackage :lisp-unit2
     (:use :common-lisp :iter)
     ;; Print parameters
