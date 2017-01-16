@@ -347,7 +347,7 @@ results either to *test-stream* or a file
 
 #### ASDF
 
-`asdf:test-system` is assumed to be the canonical way of testing a
+`asdf:test-system` is assumed to be the canonical way of testing
 every system, and so lisp-unit2 makes effort to work well with
 test-system
 
